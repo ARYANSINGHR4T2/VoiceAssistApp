@@ -1,13 +1,13 @@
-name: Build and Release Android APK
+name: Build and Release Android
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch:
+  pull_request:
 
 jobs:
-  build:
+  build-release:
     runs-on: ubuntu-latest
 
     env:
@@ -15,54 +15,61 @@ jobs:
       ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
     steps:
-      - name: Checkout repo
+      # Checkout the repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Setup Node.js with npm cache
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Cache Gradle
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper/
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            gradle-${{ runner.os }}-
+      # Install npm dependencies
+      - name: Install npm dependencies
+        run: npm ci
 
-      - name: Cache npm
-        uses: actions/cache@v3
-        with:
-          path: ~/.npm
-          key: npm-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            npm-${{ runner.os }}-
-
-      - name: Install dependencies
-        run: npm install
-
+      # Setup Android SDK
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v2
         with:
           api-level: 33
           build-tools: 33.0.0
-          cache: true
+          cache: gradle
 
-      - name: Grant execute permission for Gradlew
-        run: chmod +x android/gradlew
-
-      - name: Build Release APK
+      # Build Android release AAB and APK
+      - name: Build Android release
         run: |
           cd android
+          ./gradlew bundleRelease
           ./gradlew assembleRelease
 
-      - name: Upload APK artifact
+      # Upload artifacts to GitHub Actions (optional)
+      - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-apk
-          path: android/app/build/outputs/apk/release/app-release.apk
+          name: android-builds
+          path: |
+            android/app/build/outputs/bundle/release/app-release.aab
+            android/app/build/outputs/apk/release/app-release.apk
+
+      # Create GitHub Release and upload APK/AAB
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Release ${{ github.run_number }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload APK/AAB to GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            android/app/build/outputs/bundle/release/app-release.aab
+            android/app/build/outputs/apk/release/app-release.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
