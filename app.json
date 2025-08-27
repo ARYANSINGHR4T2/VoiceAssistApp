@@ -1,0 +1,45 @@
+{
+  "name": "VoiceAssistApp",
+  "displayName": "VoiceAssist",
+  "description": "A voice-controlled accessibility app for hands-free mobile device control",
+  "version": "1.0.0",
+  "orientation": "portrait",
+  "privacy": "public",
+  "platforms": ["android", "ios"],
+  "android": {
+    "package": "com.voiceassist.app",
+    "versionCode": 1,
+    "permissions": [
+      "RECORD_AUDIO",
+      "CAMERA",
+      "WRITE_EXTERNAL_STORAGE",
+      "READ_EXTERNAL_STORAGE",
+      "CALL_PHONE",
+      "READ_CONTACTS",
+      "SEND_SMS",
+      "ACCESS_FINE_LOCATION",
+      "ACCESS_COARSE_LOCATION",
+      "READ_CALL_LOG",
+      "MODIFY_AUDIO_SETTINGS",
+      "WAKE_LOCK",
+      "RECEIVE_BOOT_COMPLETED",
+      "FOREGROUND_SERVICE"
+    ],
+    "largeHeap": true,
+    "allowBackup": false
+  },
+  "ios": {
+    "bundleIdentifier": "com.voiceassist.app",
+    "buildNumber": "1.0.0",
+    "supportsTablet": true,
+    "infoPlist": {
+      "NSMicrophoneUsageDescription": "VoiceAssist needs microphone access to listen for voice commands",
+      "NSCameraUsageDescription": "VoiceAssist needs camera access to take photos and videos",
+      "NSContactsUsageDescription": "VoiceAssist needs contacts access to make calls and send messages",
+      "NSLocationWhenInUseUsageDescription": "VoiceAssist needs location access for emergency services and navigation",
+      "NSPhotoLibraryUsageDescription": "VoiceAssist needs photo library access to save pictures",
+      "NSSpeechRecognitionUsageDescription": "VoiceAssist needs speech recognition to understand voice commands",
+      "UIBackgroundModes": ["audio", "background-processing", "voice-over-ip"]
+    }
+  }
+}
