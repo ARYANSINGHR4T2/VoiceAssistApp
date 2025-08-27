@@ -1,75 +1,49 @@
-name: Build and Release Android
+name: Build and Release VoiceAssistApp
 
 on:
   push:
     branches:
       - main
   pull_request:
+    branches:
+      - main
 
 jobs:
-  build-release:
+  build:
+    name: Build App
     runs-on: ubuntu-latest
 
-    env:
-      NODE_VERSION: 18
-      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
-
     steps:
-      # Checkout the repo
+      # 1️⃣ Checkout the repo
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Setup Node.js with npm cache
+      # 2️⃣ Set up Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          node-version: 18
+          cache: "npm"
 
-      # Install npm dependencies
-      - name: Install npm dependencies
-        run: npm ci
+      # 3️⃣ Install dependencies
+      - name: Install Dependencies
+        run: npm install
 
-      # Setup Android SDK
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v2
-        with:
-          api-level: 33
-          build-tools: 33.0.0
-          cache: gradle
+      # 4️⃣ Run lint
+      - name: Run ESLint
+        run: npm run lint
 
-      # Build Android release AAB and APK
-      - name: Build Android release
-        run: |
-          cd android
-          ./gradlew bundleRelease
-          ./gradlew assembleRelease
+      # 5️⃣ Run tests
+      - name: Run Tests
+        run: npm test
 
-      # Upload artifacts to GitHub Actions (optional)
-      - name: Upload release artifacts
+      # 6️⃣ Build Android bundle
+      - name: Build Android Bundle
+        run: npm run build
+
+      # 7️⃣ Upload artifact (bundle) for release
+      - name: Upload Bundle
         uses: actions/upload-artifact@v4
         with:
-          name: android-builds
-          path: |
-            android/app/build/outputs/bundle/release/app-release.aab
-            android/app/build/outputs/apk/release/app-release.apk
-
-      # Create GitHub Release and upload APK/AAB
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v${{ github.run_number }}
-          name: Release ${{ github.run_number }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload APK/AAB to GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            android/app/build/outputs/bundle/release/app-release.aab
-            android/app/build/outputs/apk/release/app-release.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-
+          name: android-bundle
+          path: android/app/src/main/assets/index.android.bundle
