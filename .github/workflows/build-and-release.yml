@@ -1,4 +1,4 @@
-name: Build and Release VoiceAssist App
+name: Build and Test VoiceAssist App
 
 on:
   push:
@@ -9,32 +9,29 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      NODE_ENV: production
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: 18
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
 
-      - name: Install React Native CLI
-        run: npm install -g react-native-cli
+      - name: Run ESLint
+        run: npm run lint
 
-      - name: Run Android build
+      - name: Run tests
+        run: npm test
+
+      - name: Bundle React Native JS
         run: |
           mkdir -p android/app/src/main/assets
-          npm run build
+          npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-bundle
-          path: android/app/src/main/assets/index.android.bundle
+      - name: Echo Success
+        run: echo "VoiceAssist app JS bundle created successfully!"
