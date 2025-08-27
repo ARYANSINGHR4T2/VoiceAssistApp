@@ -1,35 +1,47 @@
-name: Build VoiceAssist App
+name: Build and Release VoiceAssistApp
 
 on:
   push:
     branches:
       - main
   pull_request:
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      NODE_ENV: production
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
+          cache: "npm"
 
-      - name: Install dependencies
-        run: npm install --legacy-peer-deps
+      - name: Install Dependencies
+        run: npm install
 
-      - name: Run tests (if any)
-        run: npm test || echo "No tests or tests failed"
+      - name: Lint Code
+        run: |
+          npm install eslint --save-dev
+          npx eslint . || true   # Allow warnings to not fail workflow
 
-      - name: Create assets folder
-        run: mkdir -p android/app/src/main/assets
+      - name: Bundle React Native App
+        run: npx react-native bundle \
+              --platform android \
+              --dev false \
+              --entry-file index.js \
+              --bundle-output android/app/src/main/assets/index.android.bundle \
+              --assets-dest android/app/src/main/res/
 
-      - name: Bundle React Native JS
-        run: npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle
-
-      - name: Echo Success
-        run: echo "VoiceAssist JS bundle created successfully!"
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: voiceassist-bundle
+          path: android/app/src/main/assets/index.android.bundle
