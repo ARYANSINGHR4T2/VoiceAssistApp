@@ -1,153 +1,93 @@
-name: Build and Test VoiceAssist App
+name: Build and Release Android
 
 on:
   push:
-    branches: [ main, master ]
-    tags: [ 'v*' ]
-  pull_request:
-    branches: [ main, master ]
-  workflow_dispatch: # Allow manual trigger
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+    env:
+      NODE_VERSION: 18
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+      GRADLE_USER_HOME: ${{ github.workspace }}/.gradle
+
     steps:
-    - name: 🏗 Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    - name: 🏗 Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
 
-    - name: 📦 Install dependencies
-      run: |
-        if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ] || [ -f yarn.lock ]; then
-          echo "Lock file found — enabling reproducible install..."
-          npm ci
-        else
-          echo "No lock file found — running npm install (no cache)..."
+      - name: Install dependencies
+        run: |
           npm install
-        fi
+          npm install --global yarn
 
-    - name: 🧪 Run tests
-      run: npm test -- --passWithNoTests
+      - name: Cache Node modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.npm
+            node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
 
-    - name: 🔍 Run linter
-      run: npm run lint || true
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 17
 
-    - name: 🏗 Setup Java JDK
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '17'
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v2
+        with:
+          api-level: 33
+          build-tools: 33.0.0
+          ndk: 25.2.9519653
 
-    - name: 🏗 Setup Android SDK
-      uses: android-actions/setup-android@v3
+      - name: Grant execute permission for gradlew
+        run: chmod +x android/gradlew
 
-    - name: 📱 Initialize React Native project (if needed)
-      run: |
-        if [ ! -d "android" ]; then
-          echo "Creating Android project structure..."
-          npx react-native init VoiceAssistTemp --version 0.72.6
-          cp -r VoiceAssistTemp/android .
-          cp -r VoiceAssistTemp/ios . || true
-          rm -rf VoiceAssistTemp
-          sed -i 's/com.voiceassisttemp/com.voiceassistapp/g' android/app/src/main/AndroidManifest.xml || true
-          sed -i 's/com.voiceassisttemp/com.voiceassistapp/g' android/app/build.gradle || true
-        fi
+      - name: Build Release APK
+        run: |
+          cd android
+          ./gradlew clean
+          ./gradlew assembleRelease
 
-    - name: 🔑 Create debug keystore
-      run: |
-        mkdir -p android/app
-        keytool -genkeypair -v -keystore android/app/debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Debug,O=Android,C=US" || true
+      - name: Archive APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: app-release-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
 
-    - name: 🔧 Make gradlew executable
-      run: chmod +x android/gradlew
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    - name: 🏗 Build Android APK
-      run: |
-        cd android
-        ./gradlew assembleRelease --no-daemon --stacktrace
+      - name: Download APK artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: app-release-apk
+          path: ./apk
 
-    - name: 📤 Upload APK as artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: voice-assist-app-${{ github.run_number }}
-        path: android/app/build/outputs/apk/release/app-release.apk
-        retention-days: 30
-
-    - name: 🚀 Create GitHub Release
-      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
-      uses: softprops/action-gh-release@v1
-      with:
-        files: android/app/build/outputs/apk/release/app-release.apk
-        name: VoiceAssist ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'Latest Build' }}
-        tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('build-{0}', github.run_number) }}
-        prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
-        body: |
-          ## 📱 VoiceAssist - Voice-Controlled Accessibility App
-          
-          ### 🔽 How to Test (Android)
-          
-          1. **Download APK**: Click on `app-release.apk` below
-          2. **Enable Unknown Sources**: 
-             - Go to Settings > Security
-             - Enable "Install from unknown sources" or "Unknown sources"
-          3. **Install**: Open the downloaded APK file to install
-          4. **Permissions**: Grant all requested permissions (essential for voice control)
-          5. **Test**: Say "Hey Assistant" to start!
-          
-          ### 🎤 Voice Commands to Try
-          
-          **📸 Camera & Media**
-          - "Take a photo" | "Take a selfie" 
-          - "Start recording" | "Stop recording"
-          
-          **📱 Device Control**
-          - "Turn on flashlight" | "Turn off flashlight"
-          - "Volume up" | "Volume down" | "Set volume to 75%"
-          - "Battery status" | "Device info"
-          
-          **📞 Communication** 
-          - "Call [contact name]" | "Call [phone number]"
-          - "Send message to [contact name]"
-          - "Recent calls"
-          
-          **🚨 Emergency Features**
-          - "Emergency" (activates SOS mode)
-          - "Call 911" (be careful with this!)
-          - "Where am I?" (location info)
-          
-          **🧭 Navigation**
-          - "Open [app name]" (e.g., "Open Camera", "Open WhatsApp")
-          - "Navigate to [destination]"
-          - "Go to home screen"
-          
-          ### ✅ Testing Checklist
-          
-          - [ ] Voice activation: Say "Hey Assistant" - should respond
-          - [ ] Camera: "Take a photo" - should open camera and take photo
-          - [ ] Flashlight: "Turn on flashlight" - should activate flashlight
-          - [ ] Help: "Help" - should list available commands
-          - [ ] Volume: "Volume up" - should increase volume
-          
-          ### ⚠️ Important Notes
-          
-          - **Use a physical device** (voice recognition doesn't work well on emulators)
-          - **Grant ALL permissions** when installing (required for full functionality)
-          - **Test in a quiet environment** initially for best voice recognition
-          - **Emergency commands are real** - use caution with "Call 911" etc.
-          
-          ---
-          
-          🤖 **Auto-built from commit:** `${{ github.sha }}`  
-          🕒 **Build time:** ${{ github.event.head_commit.timestamp }}  
-          🔢 **Build number:** #${{ github.run_number }}
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-          🔢 **Build number:** #${{ github.run_number }}
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: 🚀 Create GitHub Release
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
+        uses: softprops/action-gh-release@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          files: ./apk/app-release.apk
+          name: VoiceAssist ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'Latest Build' }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('build-{0}', github.run_number) }}
+          prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+          body: |
+            ## 📱 VoiceAssist - Voice-Controlled Accessibility App
+            Latest automated release build.
