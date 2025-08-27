@@ -20,10 +20,16 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        cache: 'npm'
 
     - name: 📦 Install dependencies
-      run: npm install
+      run: |
+        if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ] || [ -f yarn.lock ]; then
+          echo "Lock file found — enabling reproducible install..."
+          npm ci
+        else
+          echo "No lock file found — running npm install (no cache)..."
+          npm install
+        fi
 
     - name: 🧪 Run tests
       run: npm test -- --passWithNoTests
@@ -39,14 +45,6 @@ jobs:
 
     - name: 🏗 Setup Android SDK
       uses: android-actions/setup-android@v3
-
-    - name: ⚙️ Ensure metro.config.js exists
-      run: |
-        if [ ! -f "metro.config.js" ]; then
-          echo "Creating a minimal metro.config.js..."
-          echo "const { getDefaultConfig } = require('expo/metro-config');" > metro.config.js
-          echo "module.exports = getDefaultConfig(__dirname);" >> metro.config.js
-        fi
 
     - name: 📱 Initialize React Native project (if needed)
       run: |
@@ -146,6 +144,10 @@ jobs:
           
           🤖 **Auto-built from commit:** `${{ github.sha }}`  
           🕒 **Build time:** ${{ github.event.head_commit.timestamp }}  
+          🔢 **Build number:** #${{ github.run_number }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
           🔢 **Build number:** #${{ github.run_number }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
