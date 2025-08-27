@@ -1,31 +1,40 @@
-name: Build VoiceAssistApp
+name: Build and Release VoiceAssist App
 
 on:
   push:
     branches:
       - main
+  pull_request:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      NODE_ENV: production
 
     steps:
-      # 1️⃣ Checkout code
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      # 2️⃣ Setup Node.js
-      - uses: actions/setup-node@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: '18'
+          cache: 'npm'
 
-      # 3️⃣ Install dependencies (creates package-lock.json)
-      - run: npm install
+      - name: Install dependencies
+        run: npm install
 
-      # 4️⃣ Build Android JS bundle
-      - run: npm run build
+      - name: Install React Native CLI
+        run: npm install -g react-native-cli
 
-      # 5️⃣ Upload bundle as artifact
-      - uses: actions/upload-artifact@v4
+      - name: Run Android build
+        run: |
+          mkdir -p android/app/src/main/assets
+          npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
         with:
           name: android-bundle
           path: android/app/src/main/assets/index.android.bundle
